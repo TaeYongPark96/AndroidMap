@@ -7,6 +7,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -20,9 +21,10 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback{
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, LocationListener{
 
     private GoogleMap mMap;
+    private Location currLocation = new Location("");;
     private String TAG = "mainActivity";
     private int mapZoom = 10;
 
@@ -59,10 +61,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         fab.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
-                Location myLocation = getGeoLocation();
-                if (myLocation != null) {
-                    double lng = myLocation.getLongitude();
-                    double lat = myLocation.getLatitude();
+                getGeoLocation();
+                if (currLocation != null) {
+                    double lng = currLocation.getLongitude();
+                    double lat = currLocation.getLatitude();
                     Log.d(TAG, "longtitude=" + lng + ", latitude=" + lat);
 
                     LatLng userLocation = new LatLng(lat, lng);
@@ -97,8 +99,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
 
-    public Location getGeoLocation() {
-        Location currentLocation = null;
+    public void getGeoLocation() {
 
         // check User Permission
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
@@ -106,16 +107,53 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             // Request User to location Permission
             ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION}
                     , 100);
-            return null;
+            return;
         }
 
         LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        currentLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
 
-        if (currentLocation == null) {
+        // GPS 프로바이더 사용가능여부
+        boolean isGPSEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+        // 네트워크 프로바이더 사용가능여부
+        boolean isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+        Log.d(TAG, "isGPSEnabled="+ isGPSEnabled);
+        Log.d(TAG, "isNetworkEnabled="+ isNetworkEnabled);
+
+        // Register the listener with the Location Manager to receive location updates
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, this);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
+
+        if (currLocation == null ||
+                currLocation.getLatitude()==0.0 || currLocation.getLongitude()==0.0) {
             Log.d(TAG, "Get Current Location Fail!!!");
+            Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            currLocation.setLatitude(location.getLatitude());
+            currLocation.setLongitude(location.getLongitude());
         }
 
-        return currentLocation;
+//        locationManager.removeUpdates(locationListener);
+
+    }
+
+
+    public void onLocationChanged(Location location) {
+        double lat = location.getLatitude();
+        double lng = location.getLongitude();
+        currLocation.setLatitude(location.getLatitude());
+        currLocation.setLongitude(location.getLongitude());
+        Log.d(TAG,"latitude: "+ lat +", longitude: "+ lng);
+    }
+
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+        Log.d(TAG,"onStatusChanged");
+    }
+
+    public void onProviderEnabled(String provider) {
+        Log.d(TAG,"onProviderEnabled");
+    }
+
+    public void onProviderDisabled(String provider) {
+        Log.d(TAG,"onProviderDisabled");
     }
 }
